@@ -1,0 +1,62 @@
+.menu-tree {
+  /* display:none; Replaced with document.write in HEAD tags. */
+}
+
+.exp {
+    cursor: pointer;
+}
+
+.menu-tree ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+.menu-tree li li {
+    /*background-image: url(page.png);
+    background-position: 0 1px;
+    background-repeat: no-repeat;*/
+    padding-left: 20px;
+}
+.menu-tree li.folder {
+}
+
+.menu-tree span {
+  background: transparent url(files/arrow-left.png) no-repeat left top;
+  background-position: -4px -4px;
+  background-size: 16px 16px;
+  padding: 0px 0 0px 21px;
+  display: block;
+  color: #000000;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.menu-tree span.expanded {
+  background: transparent url(files/arrow-down.png) no-repeat left top;
+  background-size: 16px 16px;
+  background-position: -4px -4px;
+}
+
+.menu-tree span:hover {
+  text-decoration: underline;
+  background-color:#ccc;
+}
+
+
+/* ---------------------------------- */
+
+/* This text is in monospace */
+span.bumpspan {
+    font-family: monospace; font-size: 10px; font-style: normal; font-variant: normal; font-weight: 700; line-height: 26.4px;
+}
+
+.bumpselectbox {
+  width: 200px;
+  font-family: monospace; font-size: 12px; font-style: normal; font-variant: normal; font-weight: 600; line-height: 26.4px;
+}
+
+.shaselectbox {
+  width: 400px;
+  font-family: monospace; font-size: 12px; font-style: normal; font-variant: normal; font-weight: 600; line-height: 26.4px;
+}

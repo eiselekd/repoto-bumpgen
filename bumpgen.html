@@ -1,0 +1,188 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <title>Generate menifest bump</title>
+    <script >
+      var defered_event_handler = [];
+    </script>
+    <script src="files/jquery-ui-1.12.1.custom/external/jquery/jquery.js"></script>
+    <script src="files/jquery-ui-1.12.1.custom/jquery-ui.js"></script>
+    <script src="files/jquery-treetable/jquery.treetable.js"></script>
+    <script src="bumpgen.js"></script>
+    <link rel="stylesheet" type="text/css" href="bumpgen.css">
+    <link rel="stylesheet" type="text/css" href="files/jquery-treetable/css/jquery.treetable.css">
+    <link rel="stylesheet" type="text/css" href="files/jquery-treetable/css/jquery.treetable.theme.default.css">
+    <link rel="stylesheet" type="text/css" href="http://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+    <script type="text/javascript" charset="utf-8">
+      $(document).ready(function(){
+	  var obj_val = [];
+	  var obj_val_repo = [];
+	  var obj_val_manifest = [];
+	  var manifest = {};
+
+	  function update(e) {
+	      var r = Object.assign({},e);
+	      r = Object.assign(r,manifest);
+	      return r;
+	  }
+	  
+	  if ("WebSocket" in window) {
+	      ws = new WebSocket("ws://" + document.domain + ":5000/api");
+	      ws.onmessage = function (msg) {
+		  var obj = JSON.parse(msg.data);
+		  console.log("> got reply");console.log(obj);
+		  if (obj.type == "mrbranches") {
+		      $("#log").html("Manifest repo branches<br><p>"+obj.data.join("<br>\n")+"</p>")
+		      var idx = 0;
+		      $('#mrbranches').empty();
+		      $('#manifestfiles').empty();
+		      for (const e of obj.data) {
+			  obj_val[idx] = e;
+			  $('#mrbranches').append(new Option(e.mrb,idx));
+			  idx += 1;
+		      };
+		      $("#mrbranches").unbind("click");
+		      $("#mrbranches").click(function() {
+			  var val = $('#mrbranches').val();
+			  req = {'type': 'mrbsel', 'data' : obj_val[val]}
+			  ws.send(JSON.stringify(req));
+			  req.dir = "send request mrbsel";
+			  console.log(req);
+		      });
+		  } else if (obj.type == "manifestfiles") {
+		      $("#log").html("manifests files<br><p>"+obj.data.join("<br>\n")+"</p>")
+		      var idx = 0;
+		      $('#manifestfiles').empty();
+		      for (const e of obj.data) {
+			  obj_val_manifest[idx] = e;
+			  $('#manifestfiles').append(new Option(e.mfn,idx));
+			  idx += 1;
+		      };
+		      $("#manifestfiles").unbind("click");
+		      $("#manifestfiles").click(function() {
+			  var val = $('#manifestfiles').val();
+			  /* select current manifest */
+			  manifest = obj_val_manifest[val];
+			  req = {'type': 'mfnsel', 'data' : obj_val_manifest[val]};
+			  ws.send(JSON.stringify(req));
+			  req.dir = "send request mfnsel";
+			  console.log(req);
+			  
+		      });
+		  } else if (obj.type == "repolist") {
+
+		      var rootvar = new pathvar({'n':'root','path':'root'});
+		      var root = [
+			  new pathvar({'n':'by-path','path':'by-path',
+				       'c':[]})
+		      ];
+
+		      $("#log").html("manifests files<br><p>"+obj.data.join("<br>\n")+"</p>")
+		      var idx = 0;
+		      /* for each repository allocate a repovar 
+		       * reference by closure in event handles
+		       */
+		      for (const e of obj.data) {
+			  e.path="repo_"+idx;
+			  var p = new repovar(e);
+			  (function(p,e) {
+			      obj_val_repo[e.path] = p;
+			      p.events['onoff'] = function (o) {
+				  e['onoff'] = $(this).prop('checked') ? "on" : "off";
+				  var id = e.path;
+				  if (e['onoff'] == "on") {
+				      $("#repobranch-"+id).show();
+				      $("#reposha-"+id).show();
+				  } else {
+				      $("#repobranch-"+id).hide();
+				      $("#reposha-"+id).hide();
+				  }
+				  e['repo'] = e['server'];
+				  req = {'type': 'repoonoff', 'data' : update(e)};
+				  ws.send(JSON.stringify(req));
+				  req.dir = "send request repo onof: " + e['onoff'];
+				  console.log(req);
+			      };
+			      p.events['repobranch'] = function (o) {
+				  e['repobranch'] = $(this).val();
+				  req = {'type': 'repobranch', 'data' : update(e)};
+				  ws.send(JSON.stringify(req));
+				  req.dir = "send request repo branch: " + e['repobranch'];
+				  console.log(req);
+			      };
+			      p.events['reposha'] = function (o) {
+				  e['reposha'] = $(this).val();
+				  req = {'type': 'reposha', 'data' : update(e)};
+				  ws.send(JSON.stringify(req));
+				  req.dir = "send request repo sha: " + e['reposha'];
+				  console.log(req);
+			      };
+			  })(p,e);
+			  var na = e.treepath.split("/");
+			  threadpath(root[0].c, na, p, ['by-name']);
+			  idx += 1;
+		      };
+
+		      defered_event_handler = [];
+		      
+		      var treear = new gen_tree('root');
+		      treear.genar(root);
+		      treear.e = rootvar;
+		      var p = treear.html();
+		      $("#repolist").empty();
+		      $("#repolist").append(p);
+		      $("#repolist").treetable({ expandable: true },1);
+		      $("#repolist").treetable("expandAll");
+		      $(".repoelem").hide();
+
+		      for (const e of defered_event_handler) {
+			  $("#"+e[0]).bind(e[1],e[2]);
+		      }
+		  }
+		  else if (obj.type == "repobranchlist") {
+		      $("#log").html("repobranchlist<br><p>"+obj.data+"</p>")
+		      var e = obj.data;
+		      var id = e.path;
+		      obj_val_repo[id].repobranches = e.repobranches;
+		      var selid = "#repobranch-"+id;
+		      $(selid).empty();
+		      for (const i of e.repobranches) {
+			  $(selid).append(new Option(i,idx));
+		      }
+		  } else if (obj.type == "reposhalist") {
+		      $("#log").html("reposhalist<br><p>"+obj.data+"</p>")
+		      var e = obj.data;
+		      var id = e.path;
+		      obj_val_repo[id].sha = e.sha;
+		      var selid = "#reposha-"+id;
+		      $(selid).empty();
+		      for (const i of e.sha) {
+			  $(selid).append(new Option(i.sha.substr(0,7) + ":" + i.summary,i.sha));
+		      }
+		  }
+	      };
+	      ws.onopen = function () {
+		  ws.send(JSON.stringify({'type': 'start'}));
+	      };
+	  } else {
+	      alert("WebSocket not supported");
+	  }
+      });
+      </script>
+</head>
+<body>
+
+  <span class="bumpspan">Manifest repo branch:</span> <select id="mrbranches" class="bumpselectbox"></select><br>
+  <span class="bumpspan">Manifest file&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;:</span> <select id="manifestfiles" class="bumpselectbox"></select><br>
+  <!--
+      repo list:<br>
+      <div id="repolist" class="menu-tree column expleft">          <ul>
+	</ul>
+      </div><br> !-->
+
+      <table id="repolist">
+      </table>
+
+      <!-- <div id="log"></div> !-->
+</body>
+</html>
