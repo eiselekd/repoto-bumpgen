@@ -95,7 +95,7 @@
 				  var id = e.path;
 				  if (e['onoff'] == "on") {
 				      $("#repobranch-"+id).show();
-				      $("#reposha-"+id).show();
+				      $("#reposha-"+id).hide();
 				  } else {
 				      $("#repobranch-"+id).hide();
 				      $("#reposha-"+id).hide();
@@ -107,11 +107,18 @@
 				  console.log(req);
 			      };
 			      p.events['repobranch'] = function (o) {
-				  e['repobranch'] = $(this).val();
-				  req = {'type': 'repobranch', 'data' : update(e)};
-				  ws.send(JSON.stringify(req));
-				  req.dir = "send request repo branch: " + e['repobranch'];
-				  console.log(req);
+				  var id = e.path;
+				  var ref = $(this).val();
+				  if (ref.match(/refs\/.*/)) {
+				      $("#reposha-"+id).hide();
+				  } else {
+				      $("#reposha-"+id).show();
+				      e['repobranch'] = ref;
+				      req = {'type': 'repobranch', 'data' : update(e)};
+				      ws.send(JSON.stringify(req));
+				      req.dir = "send request repo branch: " + e['repobranch'];
+				      console.log(req);
+				  }
 			      };
 			      p.events['reposha'] = function (o) {
 				  e['reposha'] = $(this).val();
@@ -149,6 +156,10 @@
 		      obj_val_repo[id].repobranches = e.repobranches;
 		      var selid = "#repobranch-"+id;
 		      $(selid).empty();
+		      for (const i of e.reviews) {
+			  var n = "gerrit:"+i.ref + ":" + i.subject;
+			  $(selid).append(new Option(n,i.ref));
+		      }
 		      for (const i of e.repobranches) {
 			  $(selid).append(new Option(i,idx));
 		      }
@@ -166,10 +177,47 @@
 	      };
 	      ws.onopen = function () {
 		  ws.send(JSON.stringify({'type': 'start'}));
-	      };
+	      }
+
+	      setInterval(function(){
+		  $("#request").empty();
+		  $(".bumpcheck").each(function() {
+		      var val = $(this).prop('checked') ? "on" : "off"
+		      if (val == "on") {
+			  var id = $(this).attr('id');
+			  var m = id.match(/onoff-(.+)/);
+			  if (m) {
+			      id = m[1];
+			      var repobranchid = "repobranch-"+id;
+			      var reposhaid = "reposha-"+id;
+			      var b = $("#"+repobranchid).val();
+			      var sha = "";
+			      var up = "";
+			      var r = obj_val_repo[id]
+			      if (!(b == undefined)) {
+				  if (!b.match(/refs\/.*/)) {
+				      var sha = $("#"+reposhaid).val();
+				      if (!(sha == undefined)) {
+					  up = "update "+r.path + " with sha "+ sha;
+				      } else {
+					  up = "update "+r.path + " with sha <please select>";
+				      }
+				  } else {
+				      up = "update "+r.path + " with gerrit upref " + b;
+				  }
+				  $("#request").append("<tr><td>"+up+"</td><tr>")
+			      }
+			      
+			      //console.log(m[1])
+			  }
+		      }
+		  });
+	      }, 1000);
 	  } else {
 	      alert("WebSocket not supported");
 	  }
+
+	  
       });
       </script>
 </head>
@@ -186,6 +234,9 @@
       <table id="repolist">
       </table>
 
+      Update request:<br>
+      <table id="request">
+      </table>
       <!-- <div id="log"></div> !-->
 </body>
 </html>

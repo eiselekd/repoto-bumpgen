@@ -306,7 +306,7 @@ gen_tree.prototype.html = function(parent, na)
     if ((this.e instanceof repovar)) {
         var e = this.e;
         var onoffid = "onoff-"+id;
-        onoffcheckbox = "<input type=\"checkbox\" id=\""+onoffid+"\"/>";
+        onoffcheckbox = "<input type=\"checkbox\" id=\""+onoffid+"\" class=\"bumpcheck\"/>";
         defered_event_handler.push([onoffid, "change", function() {
             e.propagate_event("onoff", this, e);
         } ]);

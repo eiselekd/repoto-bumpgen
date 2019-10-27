@@ -109,7 +109,7 @@ def repoBranches(repourl):
     return listOfRepoBranches(rv,"(.+)");
 
 def getGerritReviews(repourl):
-
+    r = []
     print("getGerritReviews '{}'".format(repourl))
 
     a = repourl.split("//");
@@ -135,13 +135,16 @@ def getGerritReviews(repourl):
             j = json.loads(l);
             if ('status' in j):
                 print (json.dumps(j, sort_keys=True, indent=4, separators=(',', ': ')))
-                pass
-        except:
-            pass
+                r.append({'subject': j['subject'], 'ref' : j['currentPatchSet']['ref'] , 'number' : j['number']});
+        except Exception as e:
+            print(str(e))
+    r = sorted(r, key=lambda x: x['number'])
+    return r
 
 def repoBranchComits(repourl, repobranch):
     d = os.path.join("/tmp/repo_work", serverUrlToPath(repourl));
     commits = [];
+    print("repoBranchComits from '{}'".format(d))
     rv=Repo(d)
     for c in rv.iter_commits(rev="refs/heads/"+repobranch, max_count=100):
         commits.append(c);
@@ -239,15 +242,16 @@ def api():
                 if (req['data']['onoff'] == "on"):
                     pa = repoBranches(repoonoff.repo);
                     ra = getGerritReviews(repoonoff.review);
+                    print(" + Reviews found " + str(ra));
 
-                    ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa })}));
+                    ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa, 'reviews' : ra })}));
 
                 #ws.send(json.dumps({'type': 'manifestfiles', 'data' : manifestfiles}));
 
             elif (req['type'] == 'repobranch'):
 
                 repobranch = selobj(req['data'])
-                pa = repoBranchComits(repoonoff.repo, repobranch.repobranch);
+                pa = repoBranchComits(repobranch.repo, repobranch.repobranch);
                 ws.send(json.dumps({'type': 'reposhalist', 'data' : update(repobranch.tohash(), {'sha' : pa })}));
 
             time.sleep(1);
