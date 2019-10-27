@@ -51,6 +51,10 @@ span.bumpspan {
     font-family: monospace; font-size: 10px; font-style: normal; font-variant: normal; font-weight: 700; line-height: 26.4px;
 }
 
+table.bumpspan {
+    font-family: monospace; font-size: 10px; font-style: normal; font-variant: normal; font-weight: 700; line-height: 26.4px;
+}
+
 .bumpselectbox {
   width: 200px;
   font-family: monospace; font-size: 12px; font-style: normal; font-variant: normal; font-weight: 600; line-height: 26.4px;
