@@ -1,4 +1,4 @@
-import os, re, json, time, copy, argparse
+import os, re, json, time, copy, argparse, subprocess
 from glob import glob
 # apt install python-git
 from git import Repo
@@ -20,6 +20,9 @@ from gevent.pywsgi import WSGIServer
 
 parser = argparse.ArgumentParser(prog='dumpgen')
 parser.add_argument('--verbose', action='store_true', help='verbose')
+parser.add_argument('--prepare', action='store_true', help='verbose')
+parser.add_argument('--manifestrepo', '-r', type=str, default='test/manifest_test0', help='repo manifest dir')
+parser.add_argument('--workdir', '-w', type=str, default='/tmp/repoto', help='work directory')
 opt = parser.parse_args()
 
 app = Flask(__name__, template_folder=".")
@@ -28,29 +31,71 @@ app = Flask(__name__, template_folder=".")
 def static_file(path):
     return send_from_directory(cdir, path)
 
-repodir="/data/repo"
+repodir=opt.manifestrepo
 workdir="/tmp/repoto"
+prepare_repobranch="master";
+prepare_manifest="/data/repo/default.xml";
+
+def serverFrom(r,e,typ="fetch"):
+    if (typ == "fetch"):
+        server=e.xml.attrib['_gitserver_']
+    else:
+        server=e.xml.attrib['_reviewserver_']
+    if (server.startswith("..")):
+        repofetchurl = [n for n in r.remotes[0].urls][0]        
+        a = repofetchurl.split("/");
+        #print ("----- " + str(a));
+        a.pop()
+        #print ("----- " + str(a));
+        a.append (e.name);
+        #print ("----- " + str(a));
+        server = "/".join(a);
+    else:
+        if (not server.endswith("/")):
+            server+="/"
+        server+=e.name;
+    print ("----- " + server);
+    return server
+
+def prepareRepo():
+    global opt;
+    r = Repo(repodir)
+    r.git.checkout(prepare_repobranch);
+    m0 = manifest(opt, prepare_manifest);
+    p0 = m0.get_projar();
+    pa = []
+    for e in p0.p:
+        server = serverFrom(r,e)
+        d = os.path.join("/tmp/repo_work", serverUrlToPath(server));
+        print("Clone {} into {}".format(server, d))
+        rv=Repo.clone_from(server, d, multi_options=["--mirror"])
 
 ############################################
 #
-def listOfRepoBranches(rv):
-    r={'origin' : []}
-    for bn in rv.git.branch("-r").split("\n"):
-        m = re.match("origin/(.+)", bn.strip())
+def listOfRepoBranches(rv, f):
+    r=[]
+    for bn in rv.git.branch("-a").split("\n"):
+        bn = bn.strip()
+        if (bn.startswith("*")):
+            bn = bn[1:].strip();
+        m = re.match(f, bn)
         if (m):
             g = m.group(1);
-            if (g.startswith("HEAD ->")):
+            print("> match: {} : {}".format(bn.strip(), g))
+            if not (g.find("HEAD ->") == -1):
                 continue
-            r['origin'].append(g)
+            r.append(g)
     return r;
 
 def listOfManifestRepoBranches():
     manifestrepo=Repo(repodir)
-    return listOfRepoBranches(manifestrepo);
+    return listOfRepoBranches(manifestrepo, ".*origin/(.+)");
 
 def serverUrlToPath(url):
     url = url.replace("/","_");
     url = url.replace(":","_");
+    if not (url.endswith(".git")):
+        url += ".git"
     return url;
 
 def repoBranches(repourl):
@@ -59,15 +104,46 @@ def repoBranches(repourl):
     try:
         rv=Repo(d)
     except Exception as e:
-        print("try clone "+str(e));
-        rv=Repo.clone_from(repourl, d)
-    return listOfRepoBranches(rv);
+        print("try clone '{}' into '{}'".format(repourl, d));
+        rv=Repo.clone_from(repourl, d, multi_options=["--mirror"])
+    return listOfRepoBranches(rv,"(.+)");
+
+def getGerritReviews(repourl):
+
+    print("getGerritReviews '{}'".format(repourl))
+
+    a = repourl.split("//");
+    if (a[0] != "ssh:"):
+        return []
+    a = a[1];
+    a = a.split("/");
+    reviewport="29418"
+    reviewserver=a.pop(0);
+    reviewserver = reviewserver.split(":");
+    if (len(reviewserver) > 1):
+        reviewport = reviewserver[1];
+    reviewserver = reviewserver[0];
+    a = "/".join(a);
+    if (a.endswith(".git")):
+        a = a[:-4];
+    project=a
+    args = ['ssh', '-x', '-p', reviewport, reviewserver, 'gerrit', 'query',  '--format=JSON', '--all-approvals', '--comments', '--current-patch-set', 'project:'+project, 'status:open']
+    print(">> get review:" + " ".join(args))
+    g = subprocess.check_output(args)
+    for l in g.split("\n"):
+        try:
+            j = json.loads(l);
+            if ('status' in j):
+                print (json.dumps(j, sort_keys=True, indent=4, separators=(',', ': ')))
+                pass
+        except:
+            pass
 
 def repoBranchComits(repourl, repobranch):
     d = os.path.join("/tmp/repo_work", serverUrlToPath(repourl));
     commits = [];
     rv=Repo(d)
-    for c in rv.iter_commits(rev="refs/remotes/origin/"+repobranch, max_count=100):
+    for c in rv.iter_commits(rev="refs/heads/"+repobranch, max_count=100):
         commits.append(c);
     c = [ { 'sha': c.hexsha, 'summary': c.summary } for c in commits ]
     return c;
@@ -83,7 +159,7 @@ def update(x, y):
 #exit(0);
 # r.remotes[0].refs
 
-selobj_ar = ['repodir', 'mrb', 'mfn', 'repo', 'repobranch', 'reposha', 'path' ];
+selobj_ar = ['repodir', 'mrb', 'mfn', 'repo', 'review', 'repobranch', 'reposha', 'path' ];
 
 class selobj:
 
@@ -128,7 +204,7 @@ def api():
                 #r.remotes[0].fetch();
                 # 1: request repo branches
                 repobranches = listOfManifestRepoBranches()
-                ws.send(json.dumps({'type': 'mrbranches', 'data' : [ update(startobj, {'mrb' : e }) for e in repobranches['origin']]}));
+                ws.send(json.dumps({'type': 'mrbranches', 'data' : [ update(startobj, {'mrb' : e }) for e in repobranches]}));
             elif (req['type'] == 'mrbsel'):
                 mrbsel = selobj(req['data'])
                 r = Repo(mrbsel.repodir)
@@ -147,22 +223,13 @@ def api():
                 p0 = m0.get_projar();
                 pa = []
                 for e in p0.p:
-                    server=e.xml.attrib['_gitserver_']
-                    if (server.startswith("..")):
-                        repofetchurl = [n for n in r.remotes[0].urls][0]
-                        a = repofetchurl.split("/");
-                        a.pop()
-                        a[-1] = e.name;
-                        server = "/".join(a);
-                    else:
-                        if (not server.endswith("/")):
-                            server+="/"
-                        server+=e.name;
+                    server=serverFrom(r,e)
+                    reviewserver=serverFrom(r,e,typ="review")
                     p = e.path;
                     if p == None:
                         p = e.name;
                     print(server + ": " + p)
-                    pa.append({ 'treepath' : p, 'server' : server});
+                    pa.append({ 'treepath' : p, 'server' : server, 'review' : reviewserver});
 
                 ws.send(json.dumps({'type': 'repolist', 'data' : pa}));
 
@@ -170,8 +237,10 @@ def api():
 
                 repoonoff = selobj(req['data'])
                 if (req['data']['onoff'] == "on"):
-                        pa = repoBranches(repoonoff.repo);
-                        ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa['origin'] })}));
+                    pa = repoBranches(repoonoff.repo);
+                    ra = getGerritReviews(repoonoff.review);
+
+                    ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa })}));
 
                 #ws.send(json.dumps({'type': 'manifestfiles', 'data' : manifestfiles}));
 
@@ -215,5 +284,9 @@ def api():
     # return
 
 if __name__ == '__main__':
+    if (opt.prepare):
+        prepareRepo();
+
+    
     http_server = WSGIServer(('',5000), app, handler_class=WebSocketHandler)
     http_server.serve_forever()

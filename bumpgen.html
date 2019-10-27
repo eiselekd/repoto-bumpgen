@@ -28,6 +28,9 @@
 	  
 	  if ("WebSocket" in window) {
 	      ws = new WebSocket("ws://" + document.domain + ":5000/api");
+	      ws.onclose = function (msg) {
+		  alert("Connection lost, please reload\n");
+	      };
 	      ws.onmessage = function (msg) {
 		  var obj = JSON.parse(msg.data);
 		  console.log("> got reply");console.log(obj);

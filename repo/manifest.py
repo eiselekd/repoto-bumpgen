@@ -78,7 +78,7 @@ class mh_default(mh_base):
         
 class mh_project(mh_base):
     def __init__(self,args,m,xml,depth=0):
-        super(mh_project,self).__init__(args,'project',m,xml,['elem'],['name','path','revision','remote','upstream','_gitserver_'],depth=depth)
+        super(mh_project,self).__init__(args,'project',m,xml,['elem'],['name','path','revision','remote','upstream','_gitserver_','_reviewserver_'],depth=depth)
     def __str__(self):
         return "project name={}".format(self.name)
     def changed(self,p,args):
@@ -313,15 +313,15 @@ class manifest(object):
 
     def get_projar(self):
         p = projar(None,self.args)
-        nstack = [{}]
+        nstack = [{'r':{},'f':{}}]
 
-        def searchup(n):
+        def searchup(n,d='f'):
             for h in nstack:
-                if (not(n is None)) and (n in h):
-                    return h[n]
+                if (not(n is None)) and (n in h[d]):
+                    return h[d][n]
                 elif ('__default__' in h):
                     #print(h['__default__'])
-                    return h[h['__default__']]
+                    return h[d][h['__default__']]
             return None
 
         # traverse over elements and process remove-project and project
@@ -333,19 +333,22 @@ class manifest(object):
                     remote = e.remote
                 except:
                     pass
-                v = searchup(remote);
-                e.xml.attrib['_gitserver_'] = v
+                e.xml.attrib['_gitserver_'] = searchup(remote,'f')
+                e.xml.attrib['_reviewserver_'] = searchup(remote,'r')
             elif isinstance(e,mh_remove_project):
                 p.rem(e)
             elif isinstance(e,mh_remote):
                 #print(e.get_xml().decode("utf-8"))
-                nstack[0][e.name] = e.fetch
+                nstack[0]['f'][e.name] = e.fetch
+                nstack[0]['r'][e.name] = e.fetch
+                if (e.review):
+                    nstack[0]['r'][e.name] = e.review
             elif isinstance(e,mh_default):
                 #print(e.get_xml().decode("utf-8"))
                 nstack[0]['__default__'] = e.remote
             elif isinstance(e,mh_scope):
                 if e.direction == "enter":
-                    nstack.append({});
+                    nstack.append({'r':{},'f':{}});
                 elif e.direction == "exit":
                     nstack.pop();
 
