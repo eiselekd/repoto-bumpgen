@@ -156,10 +156,6 @@
 		      obj_val_repo[id].repobranches = e.repobranches;
 		      var selid = "#repobranch-"+id;
 		      $(selid).empty();
-		      for (const i of e.reviews) {
-			  var n = "gerrit:"+i.ref + ":" + i.subject;
-			  $(selid).append(new Option(n,i.ref));
-		      }
 		      for (const i of e.repobranches) {
 			  $(selid).append(new Option(i,idx));
 		      }
@@ -170,6 +166,10 @@
 		      obj_val_repo[id].sha = e.sha;
 		      var selid = "#reposha-"+id;
 		      $(selid).empty();
+		      for (const i of e.reviews) {
+			  var n = "gerrit:"+i.ref + ":" + i.subject;
+			  $(selid).append(new Option(n,i.ref));
+		      }
 		      for (const i of e.sha) {
 			  $(selid).append(new Option(i.sha.substr(0,7) + ":" + i.summary,i.sha));
 		      }

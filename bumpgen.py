@@ -108,7 +108,7 @@ def repoBranches(repourl):
         rv=Repo.clone_from(repourl, d, mirror=True) # multi_options=["--mirror"]
     return listOfRepoBranches(rv,"(.+)");
 
-def getGerritReviews(repourl):
+def getGerritReviews(repourl, b=None):
     r = []
     print("getGerritReviews '{}'".format(repourl))
 
@@ -135,6 +135,8 @@ def getGerritReviews(repourl):
             try:
                 j = json.loads(l);
                 if ('status' in j):
+                    if not ((b == None or b == j['branch'])):
+                        continue;
                     print (json.dumps(j, sort_keys=True, indent=4, separators=(',', ': ')))
                     r.append({'subject': j['subject'], 'ref' : j['currentPatchSet']['ref'] , 'number' : j['number']});
             except Exception as e:
@@ -244,10 +246,8 @@ def api():
                 repoonoff = selobj(req['data'])
                 if (req['data']['onoff'] == "on"):
                     pa = repoBranches(repoonoff.repo);
-                    ra = getGerritReviews(repoonoff.review);
-                    print(" + Reviews found " + str(ra));
 
-                    ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa, 'reviews' : ra })}));
+                    ws.send(json.dumps({'type': 'repobranchlist', 'data' : update(repoonoff.tohash(), {'repobranches' : pa, 'reviews' : [] })}));
 
                 #ws.send(json.dumps({'type': 'manifestfiles', 'data' : manifestfiles}));
 
@@ -255,7 +255,11 @@ def api():
 
                 repobranch = selobj(req['data'])
                 pa = repoBranchComits(repobranch.repo, repobranch.repobranch);
-                ws.send(json.dumps({'type': 'reposhalist', 'data' : update(repobranch.tohash(), {'sha' : pa })}));
+
+                ra = getGerritReviews(repoonoff.review, repobranch.repobranch);
+                #print(" + Reviews found " + str(ra));
+
+                ws.send(json.dumps({'type': 'reposhalist', 'data' : update(repobranch.tohash(), {'sha' : pa, 'reviews' : ra })}));
 
             time.sleep(1);
 
