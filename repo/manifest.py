@@ -5,6 +5,7 @@ from pprint import pprint
 import json
 from json import dumps, loads, JSONEncoder, JSONDecoder
 import pickle
+from git import Repo
 
 class PythonObjectEncoder(JSONEncoder):
     def default(self, obj):
@@ -56,7 +57,7 @@ class mh_base(object):
         return tostring(self.xml).rstrip()
     def shortname(self,args):
         n = self.name
-        if not (args.removepath is None):
+        if hasattr(args, 'removepath') and not (args.removepath is None):
             n = n.replace(args.removepath,"")
         return n
 
@@ -69,7 +70,19 @@ class mh_remote(mh_base):
     def __init__(self,args,m,xml,depth=0):
         super(mh_remote,self).__init__(args,'remote',m,xml,['elem'],['name','pushurl','review','fetch'],depth=depth)
         if ('fetch' in self.xml.attrib) and (self.xml.attrib['fetch'] == "../../"):
-            self.xml.attrib['fetch']=args.gitbase
+            if hasattr(args, 'gitbase'):
+                self.xml.attrib['fetch']=args.gitbase
+            else:
+                fn = m.ctx['abspath']
+                print ("abspath: "+ fn);
+                repodir = os.path.dirname(fn)
+                r = Repo(repodir)
+                repofetchurl = [n for n in r.remotes[0].urls][0]
+                a = repofetchurl.split("//");
+                b = a[1].split("/");
+                fetchurl = a[0]+"//"+b[0];
+                print ("fetchurl: "+ fetchurl);
+                self.xml.attrib['fetch']=fetchurl;
 
 class mh_default(mh_base):
     def __init__(self,args,m,xml,depth=0):
@@ -157,7 +170,7 @@ class projar(logclass):
     def add(self,e):
         self.p.append(e)
     def uniformname(self,n):
-        if not (self.args.removepath is None):
+        if hasattr(args, 'removepath') and not (self.args.removepath is None):
             n = n.replace(self.args.removepath,"")
         return n;
     def rem(self,e):
@@ -175,7 +188,7 @@ class projar(logclass):
         return a[0]
     def addproject(self,p):
         n = norig = p.name
-        if not (self.args.removepath is None):
+        if hasattr(args, 'removepath') and not (self.args.removepath is None):
             n = self.args.removepath + norig
         if p.path is None:
             p.addxml('path',norig)

@@ -68,7 +68,7 @@ def prepareRepo():
         server = serverFrom(r,e)
         d = os.path.join("/tmp/repo_work", serverUrlToPath(server));
         print("Clone {} into {}".format(server, d))
-        rv=Repo.clone_from(server, d, multi_options=["--mirror"])
+        rv=Repo.clone_from(server, d, mirror=True ); #multi_options=["--mirror"])
 
 ############################################
 #
@@ -105,7 +105,7 @@ def repoBranches(repourl):
         rv=Repo(d)
     except Exception as e:
         print("try clone '{}' into '{}'".format(repourl, d));
-        rv=Repo.clone_from(repourl, d, multi_options=["--mirror"])
+        rv=Repo.clone_from(repourl, d, mirror=True) # multi_options=["--mirror"]
     return listOfRepoBranches(rv,"(.+)");
 
 def getGerritReviews(repourl):
@@ -127,17 +127,20 @@ def getGerritReviews(repourl):
     if (a.endswith(".git")):
         a = a[:-4];
     project=a
-    args = ['ssh', '-x', '-p', reviewport, reviewserver, 'gerrit', 'query',  '--format=JSON', '--all-approvals', '--comments', '--current-patch-set', 'project:'+project, 'status:open']
-    print(">> get review:" + " ".join(args))
-    g = subprocess.check_output(args)
-    for l in g.split("\n"):
-        try:
-            j = json.loads(l);
-            if ('status' in j):
-                print (json.dumps(j, sort_keys=True, indent=4, separators=(',', ': ')))
-                r.append({'subject': j['subject'], 'ref' : j['currentPatchSet']['ref'] , 'number' : j['number']});
-        except Exception as e:
-            print(str(e))
+    try:
+        args = ['ssh', '-x', '-p', reviewport, reviewserver, 'gerrit', 'query',  '--format=JSON', '--all-approvals', '--comments', '--current-patch-set', 'project:'+project, 'status:open']
+        print(">> get review:" + " ".join(args))
+        g = subprocess.check_output(args)
+        for l in g.split("\n"):
+            try:
+                j = json.loads(l);
+                if ('status' in j):
+                    print (json.dumps(j, sort_keys=True, indent=4, separators=(',', ': ')))
+                    r.append({'subject': j['subject'], 'ref' : j['currentPatchSet']['ref'] , 'number' : j['number']});
+            except Exception as e:
+                print(str(e))
+    except:
+        print("Unable to retrieve Gerrir reviews");
     r = sorted(r, key=lambda x: x['number'])
     return r
 
