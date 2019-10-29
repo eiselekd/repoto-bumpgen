@@ -121,7 +121,8 @@ def getGerritReviews(repourl, b=None):
     reviewserver=a.pop(0);
     reviewserver = reviewserver.split(":");
     if (len(reviewserver) > 1):
-        reviewport = reviewserver[1];
+        if not (reviewserver[1] == "8080"):
+            reviewport = reviewserver[1];
     reviewserver = reviewserver[0];
     a = "/".join(a);
     if (a.endswith(".git")):
