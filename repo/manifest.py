@@ -77,7 +77,7 @@ class mh_remote(mh_base):
                 print ("abspath: "+ fn);
                 repodir = os.path.dirname(fn)
                 r = Repo(repodir)
-                repofetchurl = [n for n in r.remotes[0].urls][0]
+                repofetchurl = r.remotes[0].url
                 a = repofetchurl.split("//");
                 b = a[1].split("/");
                 fetchurl = a[0]+"//"+b[0];

@@ -228,7 +228,10 @@ def api():
                 r.git.checkout(mfnsel.mrb);
 
                 print("Load {}\n".format(mfnsel.mfn))
-                m0 = manifest(opt, mfnsel.mfn);
+                try:
+                    m0 = manifest(opt, mfnsel.mfn);
+                except Exception as e:
+                    print(e);
                 p0 = m0.get_projar();
                 pa = []
                 for e in p0.p:
