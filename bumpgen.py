@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import os, re, json, time, copy, argparse, subprocess
 from glob import glob
 # apt install python-git
@@ -29,6 +30,7 @@ app = Flask(__name__, template_folder=".")
 
 @app.route('/<path:path>')
 def static_file(path):
+    #print("test:" + path);
     return send_from_directory(cdir, path)
 
 repodir=opt.manifestrepo
@@ -303,5 +305,5 @@ if __name__ == '__main__':
         prepareRepo();
 
     
-    http_server = WSGIServer(('',5000), app, handler_class=WebSocketHandler)
+    http_server = WSGIServer(('0.0.0.0',5000), app, handler_class=WebSocketHandler)
     http_server.serve_forever()
